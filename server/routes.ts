@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated, hasRole } from "./auth";
 import { insertJobSchema, insertApplicationSchema } from "@shared/schema";
 import { z } from "zod";
+import { WebSocketServer } from 'ws';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -396,7 +397,269 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+  
+  // =================== COMPANIES ROUTES ===================
+  
+  // Get companies with filtering
+  app.get("/api/companies", async (req, res, next) => {
+    try {
+      const { search, type, location, industry, experience, page = '1', limit = '10' } = req.query;
+      
+      // Mock companies data for now
+      // In real implementation, this would query from storage
+      const companies = [
+        {
+          id: 1,
+          name: "Acme Formulation",
+          logo: "",
+          rating: 3.9,
+          reviews: 150, 
+          industry: ["Pharmaceutical & Life Sciences"],
+          type: "Corporate",
+          founded: 2004
+        },
+        {
+          id: 2,
+          name: "Digit Insurance",
+          logo: "",
+          rating: 3.9,
+          reviews: 1240,
+          industry: ["Internet", "Unicorn"],
+          type: "Startup",
+          founded: 2016
+        },
+        // More companies would be here in real implementation
+      ];
+      
+      res.json({
+        companies,
+        total: companies.length,
+        page: parseInt(page as string),
+        limit: parseInt(limit as string)
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Get company by ID
+  app.get("/api/companies/:id", async (req, res, next) => {
+    try {
+      const companyId = parseInt(req.params.id);
+      
+      // Mock company data
+      // In real implementation, this would query from storage
+      const company = {
+        id: companyId,
+        name: "Acme Technologies",
+        logo: "",
+        description: "Leading technology solutions provider with global presence",
+        website: "https://www.acmetech.com",
+        headquarters: "Bangalore, India",
+        founded: 2005,
+        industry: ["IT Services & Consulting", "Software Development"],
+        employeeCount: "1000-5000",
+        rating: 4.2,
+        reviewsCount: 235,
+        about: "Acme Technologies is a global leader in providing innovative technology solutions.",
+        benefits: [
+          "Comprehensive health insurance",
+          "Flexible work hours",
+          "Remote work options"
+        ],
+        socialLinks: {
+          linkedin: "https://www.linkedin.com/company/acmetech"
+        },
+        reviews: [
+          {
+            id: 1,
+            user: "Senior Software Engineer",
+            rating: 4,
+            title: "Great work culture with growth opportunities",
+            pros: "Good work-life balance, talented colleagues.",
+            cons: "Sometimes communication between departments could be better.",
+            date: "July 15, 2024"
+          }
+        ],
+        jobs: []
+      };
+      
+      // Get jobs for this company
+      const companyJobs = await storage.getJobs({
+        search: company.name,
+        page: 1,
+        limit: 10
+      });
+      
+      company.jobs = companyJobs.jobs;
+      
+      res.json(company);
+    } catch (error) {
+      next(error);
+    }
+  });
 
+  // =================== SERVICES ROUTES ===================
+  
+  // Get premium services
+  app.get("/api/services/premium", async (req, res) => {
+    const premiumServices = [
+      {
+        id: "resume-display",
+        title: "RESUME DISPLAY",
+        description: "Increase your Profile Visibility to recruiters upto 3 times.",
+        imageUrl: "/assets/resume-display.png",
+        price: 890,
+        period: "3 Months",
+        popular: false
+      },
+      {
+        id: "priority-applicant",
+        title: "PRIORITY APPLICANT",
+        description: "Be a Priority Applicant & increase your chance of getting a call.",
+        imageUrl: "/assets/priority-applicant.png",
+        price: 971,
+        period: "3 Months",
+        popular: true
+      },
+      {
+        id: "ai-interview",
+        title: "AI MOCK INTERVIEW",
+        description: "Personalised AI driven mock interviews for your profile",
+        imageUrl: "/assets/ai-interview.png",
+        price: 296,
+        period: "3 Months",
+        freeTrialAvailable: true
+      }
+    ];
+    
+    res.json(premiumServices);
+  });
+  
+  // Get resume services
+  app.get("/api/services/resume", async (req, res) => {
+    const resumeServices = [
+      {
+        id: "resume-writing",
+        title: "Professional Resume Writing",
+        description: "Resume that highlights your strengths and showcase your experience",
+        price: 1653,
+        pricePeriod: "One-time"
+      },
+      {
+        id: "resume-maker",
+        title: "Online Resume Maker",
+        description: "Create a job-winning resume with our simple resume maker",
+        free: true
+      }
+    ];
+    
+    res.json(resumeServices);
+  });
+  
+  // Get subscription plans
+  app.get("/api/services/subscriptions", async (req, res) => {
+    const subscriptions = [
+      {
+        id: "monthly-job-search",
+        title: "Monthly Job Search Plan",
+        benefits: [
+          "Rank higher in Recruiter Searches",
+          "Priority Access to Jobs",
+          "Send message to Recruiter anytime"
+        ],
+        price: 890,
+        period: "per month"
+      },
+      {
+        id: "quarterly-job-search",
+        title: "Quarterly Job Search Plan",
+        benefits: [
+          "Rank higher in Recruiter Searches",
+          "Priority Access to Jobs",
+          "Send message to Recruiter anytime",
+          "Profile highlighted to recruiters"
+        ],
+        price: 2400,
+        period: "for 3 months",
+        discounted: true,
+        originalPrice: 2670
+      }
+    ];
+    
+    res.json(subscriptions);
+  });
+  
+  // =================== CHATBOT WEBSOCKET ===================
+  
   const httpServer = createServer(app);
+  
+  // Setup WebSocket server for chatbot
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  wss.on('connection', (ws) => {
+    console.log('Chatbot client connected');
+    
+    // Send welcome message
+    ws.send(JSON.stringify({
+      type: 'message',
+      data: {
+        id: Date.now().toString(),
+        text: "Hi there! I'm your JobPortal assistant. How can I help you today?",
+        sender: 'bot',
+        timestamp: new Date()
+      }
+    }));
+    
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        if (data.type === 'message') {
+          // Process message and generate response
+          setTimeout(() => {
+            const responseText = processChatbotMessage(data.text);
+            
+            ws.send(JSON.stringify({
+              type: 'message',
+              data: {
+                id: Date.now().toString(),
+                text: responseText,
+                sender: 'bot',
+                timestamp: new Date()
+              }
+            }));
+          }, 1000); // Simulate processing delay
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    });
+    
+    ws.on('close', () => {
+      console.log('Chatbot client disconnected');
+    });
+  });
+  
+  // Simple message processing function
+  function processChatbotMessage(text: string): string {
+    const lowerText = text.toLowerCase();
+    
+    if (lowerText.includes("job") && lowerText.includes("apply")) {
+      return "To apply for a job, navigate to the job listing page, select a job that interests you, and click the 'Apply Now' button.";
+    } else if (lowerText.includes("resume") || lowerText.includes("cv")) {
+      return "You can upload your resume in your profile settings. We also offer professional resume writing services that can help you stand out to employers!";
+    } else if (lowerText.includes("account") && (lowerText.includes("create") || lowerText.includes("register"))) {
+      return "To create an account, click on the 'Register' button in the top right corner of the page and follow the instructions.";
+    } else if (lowerText.includes("forgot") && lowerText.includes("password")) {
+      return "If you've forgotten your password, click on the 'Login' button, then select 'Forgot Password'. We'll send you an email with instructions to reset it.";
+    } else if (lowerText.includes("contact") || lowerText.includes("support")) {
+      return "You can reach our support team at support@jobportal.com or call us at 1800-102-5557.";
+    } else if (lowerText.includes("premium") || lowerText.includes("subscription")) {
+      return "We offer various premium plans that can help boost your job search or recruitment efforts. Check out our Services page for more details!";
+    } else {
+      return "I'm not sure I understand. Could you please rephrase your question? I can help with job applications, resume tips, account issues, and more.";
+    }
+  }
   return httpServer;
 }

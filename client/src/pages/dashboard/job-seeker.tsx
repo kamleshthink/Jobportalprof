@@ -179,7 +179,9 @@ const JobSeekerDashboard = () => {
                                 </div>
                                 <div className="flex items-center">
                                   <Clock className="mr-1 h-4 w-4 text-gray-400" />
-                                  Applied {formatDistanceToNow(new Date(application.appliedAt), { addSuffix: true })}
+                                  {application.appliedAt 
+                                    ? `Applied ${formatDistanceToNow(new Date(application.appliedAt))}`
+                                    : 'Applied recently'}
                                 </div>
                               </div>
                             </div>
@@ -230,7 +232,7 @@ const JobSeekerDashboard = () => {
                 </Card>
               ) : (
                 <div className="space-y-4">
-                  {recommendedJobs.map((job) => (
+                  {Array.isArray(recommendedJobs) && recommendedJobs.map((job) => (
                     <JobCard key={job.id} job={job} />
                   ))}
                 </div>

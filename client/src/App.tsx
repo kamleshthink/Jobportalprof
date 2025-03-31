@@ -12,10 +12,14 @@ import ProfilePage from "@/pages/profile";
 import JobSeekerDashboard from "@/pages/dashboard/job-seeker";
 import EmployerDashboard from "@/pages/dashboard/employer";
 import AdminDashboard from "@/pages/dashboard/admin";
+import Companies from "@/pages/companies";
+import CompanyDetails from "@/pages/company-details";
+import Services from "@/pages/services";
 import { AuthProvider } from "./hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 import Navbar from "./components/layout/navbar";
 import Footer from "./components/layout/footer";
+import Chatbot from "./components/chatbot/chatbot";
 
 function Router() {
   return (
@@ -28,6 +32,9 @@ function Router() {
           <Route path="/auth" component={AuthPage} />
           <Route path="/jobs" component={JobListings} />
           <Route path="/jobs/:id" component={JobDetails} />
+          <Route path="/companies" component={Companies} />
+          <Route path="/companies/:id" component={CompanyDetails} />
+          <Route path="/services" component={Services} />
           
           <ProtectedRoute path="/dashboard" component={JobSeekerDashboard} />
           <ProtectedRoute path="/employer/dashboard" component={EmployerDashboard} />
@@ -40,6 +47,7 @@ function Router() {
       </div>
       
       <Footer />
+      <Chatbot />
     </div>
   );
 }
