@@ -1,10 +1,53 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import cors from 'cors';
+import { registerRoutes } from "./routes-mongo";
 import { setupVite, serveStatic, log } from "./vite";
+import { connectToMongoDB } from './mongodb';
+import { setupAuth } from './auth-mongo';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// Get current file directory in ESM (replaces __dirname)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+import multer from 'multer';
+
+// Initialize MongoDB connection
+connectToMongoDB()
+  .then((connected) => {
+    if (!connected) {
+      console.error('Failed to connect to MongoDB, exiting application');
+      process.exit(1);
+    }
+  })
+  .catch((err) => {
+    console.error('Error initializing MongoDB connection:', err);
+    process.exit(1);
+  });
+
+// Create application directory structure for uploads
+const uploadsDir = path.join(__dirname, '../uploads');
+const resumesDir = path.join(uploadsDir, 'resumes');
+
+// Create directories if they don't exist
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+if (!fs.existsSync(resumesDir)) {
+  fs.mkdirSync(resumesDir, { recursive: true });
+}
 
 const app = express();
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Set up auth (required before routes)
+setupAuth(app);
 
 app.use((req, res, next) => {
   const start = Date.now();

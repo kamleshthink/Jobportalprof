@@ -1,196 +1,175 @@
 import express, { Request, Response } from 'express';
-import { ObjectId } from 'mongodb';
 import { isAuthenticated } from '../auth-mongo';
-import { collections, toObjectId } from '../mongodb';
-import { generateOTP, sendEmailOTP, sendSMSOTP, verifyOTP, resendOTP } from '../utils/otp';
+import { generateOTP, sendEmailOTP, sendSmsOTP, verifyOTP } from '../utils/otp';
+import { collections } from '../mongodb';
 
 const router = express.Router();
 
 // Send email verification OTP
-router.post('/email/send', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/send-email-otp', isAuthenticated, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?._id;
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'User not authenticated' });
-    }
-    
-    // Generate OTP
-    const otp = generateOTP();
-    
-    // Find user's email
-    const user = await collections.users.findOne({ _id: userId });
-    if (!user || !user.email) {
-      return res.status(400).json({ success: false, message: 'User email not found' });
-    }
-    
-    // Save OTP to database
-    await collections.otpVerifications.insertOne({
-      _id: new ObjectId(),
-      userId: userId,
-      otp,
-      type: 'email',
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes from now
-      createdAt: new Date()
-    });
-    
-    // Send OTP via email
-    const emailSent = await sendEmailOTP(user.email, otp);
-    
-    if (!emailSent) {
-      return res.status(500).json({ success: false, message: 'Failed to send email OTP' });
-    }
-    
-    return res.status(200).json({ success: true, message: 'Email verification OTP sent successfully' });
-  } catch (error) {
-    console.error('Error sending email verification OTP:', error);
-    return res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-});
+    const userId = req.user._id.toString();
+    const { email } = req.user;
 
-// Verify email OTP
-router.post('/email/verify', isAuthenticated, async (req: Request, res: Response) => {
-  try {
-    const { otp } = req.body;
-    const userId = req.user?._id;
-    
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'No email associated with this account' });
     }
-    
-    if (!otp) {
-      return res.status(400).json({ success: false, message: 'OTP is required' });
+
+    const otp = generateOTP();
+    const sent = await sendEmailOTP(userId, email, otp);
+
+    if (sent) {
+      return res.status(200).json({ success: true, message: 'Email verification code sent successfully' });
+    } else {
+      return res.status(500).json({ success: false, message: 'Failed to send email verification code' });
     }
-    
-    // Verify OTP
-    const isValid = await verifyOTP(userId, otp, 'email');
-    
-    if (!isValid) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
-    }
-    
-    // Update user's emailVerified status
-    await collections.users.updateOne(
-      { _id: userId },
-      { $set: { emailVerified: true } }
-    );
-    
-    return res.status(200).json({ success: true, message: 'Email verified successfully' });
   } catch (error) {
-    console.error('Error verifying email OTP:', error);
+    console.error('Error sending email OTP:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
 // Send phone verification OTP
-router.post('/phone/send', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/send-phone-otp', isAuthenticated, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?._id;
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    const userId = req.user._id.toString();
+    const { phone } = req.user;
+
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'No phone number associated with this account' });
     }
-    
-    // Find user's phone number
-    const user = await collections.users.findOne({ _id: userId });
-    if (!user || !user.phone) {
-      return res.status(400).json({ success: false, message: 'User phone number not found' });
-    }
-    
-    // Generate OTP
+
     const otp = generateOTP();
-    
-    // Save OTP to database
-    await collections.otpVerifications.insertOne({
-      _id: new ObjectId(),
-      userId: userId,
-      otp,
-      type: 'phone',
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes from now
-      createdAt: new Date()
-    });
-    
-    // Send OTP via SMS
-    const smsSent = await sendSMSOTP(user.phone, otp);
-    
-    if (!smsSent) {
-      return res.status(500).json({ success: false, message: 'Failed to send SMS OTP' });
+    const sent = await sendSmsOTP(userId, phone, otp);
+
+    if (sent) {
+      return res.status(200).json({ success: true, message: 'Phone verification code sent successfully' });
+    } else {
+      return res.status(500).json({ success: false, message: 'Failed to send phone verification code' });
     }
-    
-    return res.status(200).json({ success: true, message: 'Phone verification OTP sent successfully' });
   } catch (error) {
-    console.error('Error sending phone verification OTP:', error);
+    console.error('Error sending phone OTP:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Combined endpoint to resend OTP (either email or phone)
+router.post('/resend-otp', isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user._id.toString();
+    const { type } = req.body; // 'email' or 'phone'
+
+    if (!type || (type !== 'email' && type !== 'phone')) {
+      return res.status(400).json({ success: false, message: 'Invalid verification type' });
+    }
+
+    const otp = generateOTP();
+    let success = false;
+
+    if (type === 'email') {
+      const { email } = req.user;
+      if (!email) {
+        return res.status(400).json({ success: false, message: 'No email associated with this account' });
+      }
+      success = await sendEmailOTP(userId, email, otp);
+    } else {
+      const { phone } = req.user;
+      if (!phone) {
+        return res.status(400).json({ success: false, message: 'No phone number associated with this account' });
+      }
+      success = await sendSmsOTP(userId, phone, otp);
+    }
+
+    if (success) {
+      return res.status(200).json({ 
+        success: true, 
+        message: `${type === 'email' ? 'Email' : 'Phone'} verification code sent successfully` 
+      });
+    } else {
+      return res.status(500).json({ 
+        success: false, 
+        message: `Failed to send ${type === 'email' ? 'email' : 'phone'} verification code` 
+      });
+    }
+  } catch (error) {
+    console.error('Error resending OTP:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Verify email OTP
+router.post('/verify-email', isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user._id.toString();
+    const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({ success: false, message: 'Verification code is required' });
+    }
+
+    const verified = await verifyOTP(userId, otp, 'email');
+
+    if (verified) {
+      return res.status(200).json({ success: true, message: 'Email verified successfully' });
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
+    }
+  } catch (error) {
+    console.error('Error verifying email:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
 // Verify phone OTP
-router.post('/phone/verify', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/verify-phone', isAuthenticated, async (req: Request, res: Response) => {
   try {
+    const userId = req.user._id.toString();
     const { otp } = req.body;
-    const userId = req.user?._id;
-    
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'User not authenticated' });
-    }
-    
+
     if (!otp) {
-      return res.status(400).json({ success: false, message: 'OTP is required' });
+      return res.status(400).json({ success: false, message: 'Verification code is required' });
     }
-    
-    // Verify OTP
-    const isValid = await verifyOTP(userId, otp, 'phone');
-    
-    if (!isValid) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+
+    const verified = await verifyOTP(userId, otp, 'phone');
+
+    if (verified) {
+      return res.status(200).json({ success: true, message: 'Phone verified successfully' });
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
     }
-    
-    // Update user's phoneVerified status
-    await collections.users.updateOne(
-      { _id: userId },
-      { $set: { phoneVerified: true } }
-    );
-    
-    return res.status(200).json({ success: true, message: 'Phone verified successfully' });
   } catch (error) {
-    console.error('Error verifying phone OTP:', error);
+    console.error('Error verifying phone:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
-// Resend OTP (for either email or phone)
-router.post('/resend', isAuthenticated, async (req: Request, res: Response) => {
+// Update phone number
+router.post('/update-phone', isAuthenticated, async (req: Request, res: Response) => {
   try {
-    const { type } = req.body;
-    const userId = req.user?._id;
-    
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    const userId = req.user._id.toString();
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
-    
-    if (!type || (type !== 'email' && type !== 'phone')) {
-      return res.status(400).json({ success: false, message: 'Valid type (email or phone) is required' });
-    }
-    
-    // Find user
-    const user = await collections.users.findOne({ _id: userId });
-    if (!user) {
-      return res.status(400).json({ success: false, message: 'User not found' });
-    }
-    
-    const contact = type === 'email' ? user.email : user.phone;
-    if (!contact) {
-      return res.status(400).json({ success: false, message: `User ${type} not found` });
-    }
-    
-    // Generate and send OTP
-    const resent = await resendOTP(userId, contact, type);
-    
-    if (!resent) {
-      return res.status(500).json({ success: false, message: `Failed to resend ${type} OTP` });
-    }
-    
-    return res.status(200).json({ success: true, message: `${type.charAt(0).toUpperCase() + type.slice(1)} verification OTP resent successfully` });
+
+    // Update user's phone number
+    await collections.users.updateOne(
+      { _id: req.user._id },
+      { 
+        $set: { 
+          phone,
+          phoneVerified: false
+        } 
+      }
+    );
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Phone number updated successfully. Please verify your new phone number.' 
+    });
   } catch (error) {
-    console.error('Error resending OTP:', error);
+    console.error('Error updating phone number:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });

@@ -7,7 +7,7 @@ import session from "express-session";
 import { ObjectId } from 'mongodb';
 import { collections, connectToMongoDB } from "./mongodb";
 import { comparePasswords, hashPassword, generateToken } from "./utils/auth";
-import { generateOTP, saveOTP, sendEmailOTP, sendSMSOTP, verifyOTP } from "./utils/otp";
+import { generateOTP, saveOTP, sendEmailOTP, sendSmsOTP, verifyOTP } from "./utils/otp";
 
 // Define types for our MongoDB user
 interface MongoUser {
@@ -253,8 +253,8 @@ export async function setupAuth(app: Express) {
       if (user) {
         // Generate and send email verification
         const otp = generateOTP();
-        await saveOTP(user._id.toString(), email, null, otp);
-        await sendEmailOTP(email, otp);
+        await saveOTP(user._id.toString(), otp, 'email');
+        await sendEmailOTP(user._id.toString(), email, otp);
 
         req.login(user, (err) => {
           if (err) return next(err);
@@ -324,7 +324,7 @@ export async function setupAuth(app: Express) {
       const { otp } = req.body;
       const userId = req.user._id.toString();
 
-      const isVerified = await verifyOTP(userId, otp);
+      const isVerified = await verifyOTP(userId, otp, 'email');
       if (!isVerified) {
         return res.status(400).json({ message: "Invalid or expired OTP" });
       }
@@ -351,7 +351,7 @@ export async function setupAuth(app: Express) {
       const { otp } = req.body;
       const userId = req.user._id.toString();
 
-      const isVerified = await verifyOTP(userId, otp);
+      const isVerified = await verifyOTP(userId, otp, 'phone');
       if (!isVerified) {
         return res.status(400).json({ message: "Invalid or expired OTP" });
       }
@@ -381,11 +381,11 @@ export async function setupAuth(app: Express) {
       const otp = generateOTP();
 
       if (type === 'email') {
-        await saveOTP(userId, req.user.email, null, otp);
-        await sendEmailOTP(req.user.email, otp);
+        await saveOTP(userId, otp, 'email');
+        await sendEmailOTP(userId, req.user.email, otp);
       } else if (type === 'phone' && req.user.phone) {
-        await saveOTP(userId, req.user.email, req.user.phone, otp);
-        await sendSMSOTP(req.user.phone, otp);
+        await saveOTP(userId, otp, 'phone');
+        await sendSmsOTP(userId, req.user.phone, otp);
       } else {
         return res.status(400).json({ message: "Invalid verification type" });
       }
