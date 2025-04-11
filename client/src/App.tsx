@@ -15,6 +15,7 @@ import AdminDashboard from "@/pages/dashboard/admin";
 import Companies from "@/pages/companies";
 import CompanyDetails from "@/pages/company-details";
 import Services from "@/pages/services";
+import ResumeManagement from "@/pages/resume-management";
 import { AuthProvider } from "./hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 import Navbar from "./components/layout/navbar";
@@ -41,6 +42,7 @@ function Router() {
           <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} />
           <ProtectedRoute path="/post-job" component={JobPostPage} />
           <ProtectedRoute path="/profile" component={ProfilePage} />
+          <ProtectedRoute path="/resume" component={ResumeManagement} />
           
           <Route component={NotFound} />
         </Switch>

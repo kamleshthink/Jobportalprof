@@ -57,34 +57,7 @@ const EmployerDashboard = () => {
     );
   }
   
-  // Show pending approval message if employer is not approved
-  if (user && user.role === 'employer' && !user.isApproved) {
-    return (
-      <div className="py-8 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Card className="border-yellow-200 bg-yellow-50">
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center p-6">
-                <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center mb-4">
-                  <svg className="w-6 h-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-yellow-800">Your account is pending approval</h2>
-                <p className="mt-2 text-yellow-700">
-                  Thank you for registering as an employer. Your account is currently under review by our administrators.
-                  You'll be notified once your account is approved, which typically takes 1-2 business days.
-                </p>
-                <p className="mt-4 text-yellow-700">
-                  If you have any questions, please contact our support team.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  // Approval check removed as requested
   
   return (
     <div className="py-8 bg-gray-50">

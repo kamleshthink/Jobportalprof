@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext } from "react";
+import { createContext, ReactNode, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -8,6 +8,7 @@ import { insertUserSchema, User, InsertUser, LoginData } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { sendVerificationOTP, verifyOTP } from "@/utils/api";
 
 type AuthContextType = {
   user: User | null;
@@ -16,6 +17,11 @@ type AuthContextType = {
   loginMutation: UseMutationResult<User, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<User, Error, InsertUser>;
+  verifyEmailMutation: UseMutationResult<any, Error, {otp: string}>;
+  verifyPhoneMutation: UseMutationResult<any, Error, {otp: string}>;
+  sendEmailOtpMutation: UseMutationResult<any, Error, void>;
+  sendPhoneOtpMutation: UseMutationResult<any, Error, void>;
+  socialLogin: (provider: 'google' | 'facebook') => void;
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -117,6 +123,116 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Verify email mutation
+  const verifyEmailMutation = useMutation({
+    mutationFn: async (data: {otp: string}) => {
+      return await verifyOTP('email', data.otp);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      toast({
+        title: "Email verified",
+        description: "Your email has been successfully verified.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Email verification failed",
+        description: error.message || "Invalid or expired OTP",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Verify phone mutation
+  const verifyPhoneMutation = useMutation({
+    mutationFn: async (data: {otp: string}) => {
+      return await verifyOTP('phone', data.otp);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      toast({
+        title: "Phone verified",
+        description: "Your phone has been successfully verified.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Phone verification failed",
+        description: error.message || "Invalid or expired OTP",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Send email OTP mutation
+  const sendEmailOtpMutation = useMutation({
+    mutationFn: async () => {
+      return await sendVerificationOTP('email');
+    },
+    onSuccess: () => {
+      toast({
+        title: "OTP sent",
+        description: "A verification code has been sent to your email.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to send OTP",
+        description: error.message || "Unable to send email OTP",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Send phone OTP mutation
+  const sendPhoneOtpMutation = useMutation({
+    mutationFn: async () => {
+      return await sendVerificationOTP('phone');
+    },
+    onSuccess: () => {
+      toast({
+        title: "OTP sent",
+        description: "A verification code has been sent to your phone.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to send OTP",
+        description: error.message || "Unable to send phone OTP",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Social login handler
+  const socialLogin = (provider: 'google' | 'facebook') => {
+    window.location.href = `/auth/${provider}`;
+  };
+
+  // Check for token in URL (for social login callback)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const token = searchParams.get('token');
+    
+    if (token) {
+      // Store token in localStorage or handle as needed for your auth flow
+      localStorage.setItem('auth_token', token);
+      
+      // Remove token from URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+      
+      // Refresh user data
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      
+      toast({
+        title: "Login successful",
+        description: "You've been successfully logged in.",
+      });
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -126,6 +242,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
+        verifyEmailMutation,
+        verifyPhoneMutation,
+        sendEmailOtpMutation,
+        sendPhoneOtpMutation,
+        socialLogin
       }}
     >
       {children}
