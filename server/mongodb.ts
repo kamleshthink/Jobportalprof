@@ -13,43 +13,92 @@ import {
 // Load environment variables
 dotenv.config();
 
-// MongoDB connection string
+// MongoDB connection string - directly use MONGODB_URI
 const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/jobPortal';
+
+// Safe log URI without exposing credentials
+const logSafeUri = (mongoUri: string) => {
+  if (!mongoUri.startsWith('mongodb')) {
+    return 'Invalid MongoDB URI format';
+  }
+  
+  if (mongoUri.includes('@')) {
+    // Hide credentials in URI that contains authentication
+    const parts = mongoUri.split('@');
+    const credentials = parts[0].split('://')[0] + '://*****:*****';
+    return credentials + '@' + parts[1];
+  }
+  
+  return mongoUri;
+};
+
+console.log('Connecting to MongoDB using URI:', logSafeUri(uri));
 
 // Create a MongoClient
 export const client = new MongoClient(uri, {
-  // Options can be configured here
+  // Configure options for better performance and compatibility
+  connectTimeoutMS: 30000,
+  socketTimeoutMS: 45000,
+  retryWrites: true,
+  retryReads: true,
+  serverSelectionTimeoutMS: 60000,
 });
 
 // Connect to MongoDB
 export const connectToMongoDB = async () => {
   try {
+    // Test the connection before proceeding
     await client.connect();
-    console.log('Connected to MongoDB');
+    await client.db().admin().ping();
+    console.log('Connected to MongoDB successfully');
     
-    // Ensure indexes for better performance
-    await setupIndexes();
+    try {
+      // Ensure indexes for better performance
+      await setupIndexes();
+    } catch (indexError) {
+      // Non-fatal error, log it but continue
+      console.warn('Warning: Could not set up all database indexes. Some queries might be slower:', indexError);
+    }
     
     return true;
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
+    // Additional info for troubleshooting
+    if (uri.includes('localhost')) {
+      console.error('You are trying to connect to a local MongoDB instance. Make sure MongoDB is running locally or provide a remote DATABASE_URL.');
+    }
     return false;
   }
 };
 
-// Setup database indexes
+// Setup database indexes - with improved error handling
 async function setupIndexes() {
+  // Helper function to safely create an index
+  const safeCreateIndex = async (
+    collection: string, 
+    indexSpec: Record<string, any>, 
+    options: Record<string, any> = {}
+  ) => {
+    try {
+      await db.collection(collection).createIndex(indexSpec, options);
+      return true;
+    } catch (error: any) {
+      console.warn(`Failed to create index on ${collection}:`, error.message);
+      return false;
+    }
+  };
+
   try {
     // User indexes
-    await db.collection('users').createIndex({ email: 1 }, { unique: true });
-    await db.collection('users').createIndex({ username: 1 }, { unique: true });
-    await db.collection('users').createIndex({ role: 1 });
+    await safeCreateIndex('users', { email: 1 }, { unique: true });
+    await safeCreateIndex('users', { username: 1 }, { unique: true });
+    await safeCreateIndex('users', { role: 1 });
     
     // Job indexes
-    await db.collection('jobs').createIndex({ postedBy: 1 });
-    await db.collection('jobs').createIndex({ status: 1 });
-    await db.collection('jobs').createIndex({ createdAt: -1 });
-    await db.collection('jobs').createIndex({ 
+    await safeCreateIndex('jobs', { postedBy: 1 });
+    await safeCreateIndex('jobs', { status: 1 });
+    await safeCreateIndex('jobs', { createdAt: -1 });
+    await safeCreateIndex('jobs', { 
       title: 'text', 
       description: 'text', 
       company: 'text',
@@ -57,25 +106,39 @@ async function setupIndexes() {
     });
     
     // Application indexes
-    await db.collection('applications').createIndex({ jobId: 1 });
-    await db.collection('applications').createIndex({ userId: 1 });
-    await db.collection('applications').createIndex({ jobId: 1, userId: 1 }, { unique: true });
+    await safeCreateIndex('applications', { jobId: 1 });
+    await safeCreateIndex('applications', { userId: 1 });
+    await safeCreateIndex('applications', { jobId: 1, userId: 1 }, { unique: true });
     
     // Company indexes
-    await db.collection('companies').createIndex({ name: 1 }, { unique: true });
+    await safeCreateIndex('companies', { name: 1 }, { unique: true });
     
     // OTP verification indexes
-    await db.collection('otpVerifications').createIndex({ userId: 1 });
-    await db.collection('otpVerifications').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    await safeCreateIndex('otpVerifications', { userId: 1 });
+    await safeCreateIndex('otpVerifications', { expiresAt: 1 }, { expireAfterSeconds: 0 });
     
     console.log('Database indexes set up successfully');
   } catch (error) {
-    console.error('Error setting up database indexes:', error);
+    console.error('Error during index setup process:', error);
+    // This is not a fatal error, we can continue without indexes
   }
 }
 
+// Extract database name from URI or use default
+const extractDbName = () => {
+  try {
+    // Try to extract DB name from the URI
+    const dbFromUri = uri.split('/').pop()?.split('?')[0];
+    // If we found a valid name, use it, otherwise default to 'jobPortal'
+    return dbFromUri || 'jobPortal';
+  } catch (error) {
+    console.warn('Could not extract DB name from URI, using default');
+    return 'jobPortal';
+  }
+};
+
 // Get database and collections
-export const db = client.db('jobPortal');
+export const db = client.db(extractDbName());
 
 export const collections = {
   users: db.collection<User>('users'),
