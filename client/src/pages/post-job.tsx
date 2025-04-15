@@ -77,6 +77,13 @@ const JobPostPage = () => {
       deductTDS: false,
       screening: [],
       applicationDeadline: false,
+      // Add missing fields that were causing validation errors
+      numberOfOpenings: "1",
+      recruitmentTimeline: "1-2 weeks",
+      additionalQualifications: "",
+      contactEmail: user?.email || "",
+      otherSupplementalPay: "",
+      startDate: "",
     }
   });
 
@@ -716,16 +723,20 @@ const JobPostPage = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold">Add pay and benefits</h1>
+                <p className="text-sm text-gray-500">
+                  Help attract the right candidates by including competitive compensation
+                </p>
               </div>
             </div>
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleNextStep)} className="space-y-6">
                 <div className="space-y-6">
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Pay</h3>
-                    <p className="text-xs text-gray-500 mb-4">
-                      Disclosing the pay rate estimated for your job will adjust it if needed. Check your local minimum wage.
+                  {/* Pay section */}
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <h3 className="text-base font-medium mb-2">Pay</h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Review the pay we estimated for your job and adjust it as needed. Check your local minimum wage.
                     </p>
                     
                     <div className="mb-4">
@@ -760,7 +771,7 @@ const JobPostPage = () => {
                       />
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {(jobPostData.payType === "Range" || jobPostData.payType === "Starting" || 
                         jobPostData.payType === "Maximum" || jobPostData.payType === "Exact") && (
                         <div>
@@ -808,7 +819,7 @@ const JobPostPage = () => {
                         </div>
                       )}
                       
-                      <div>
+                      <div className="col-span-1 md:col-span-2 lg:col-span-1">
                         <FormField
                           control={form.control}
                           name="salaryPeriod"
@@ -838,10 +849,22 @@ const JobPostPage = () => {
                         />
                       </div>
                     </div>
+                    
+                    <div className="mt-4 flex items-center gap-2">
+                      <Checkbox 
+                        id="negotiate" 
+                        checked={jobPostData.negotiable} 
+                        onCheckedChange={(checked) => 
+                          setJobPostData({ ...jobPostData, negotiable: !!checked })
+                        }
+                      />
+                      <label htmlFor="negotiate" className="text-sm">Salary negotiable</label>
+                    </div>
                   </div>
                   
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Supplemental Pay</h3>
+                  {/* Supplemental Pay section */}
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <h3 className="text-base font-medium mb-4">Supplemental Pay</h3>
                     <div className="flex flex-wrap gap-2">
                       {supplementalPayOptions.map((option) => (
                         <Button
@@ -870,10 +893,33 @@ const JobPostPage = () => {
                         </Button>
                       ))}
                     </div>
+                    
+                    {/* Show input if "Other" is selected */}
+                    {jobPostData.supplementalPay?.includes("Other") && (
+                      <div className="mt-4">
+                        <FormField
+                          control={form.control}
+                          name="otherSupplementalPay"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Please specify other supplemental pay</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  placeholder="e.g., Holiday bonuses, Fuel allowance, etc."
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
                   </div>
                   
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Benefits</h3>
+                  {/* Benefits section */}
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <h3 className="text-base font-medium mb-4">Benefits</h3>
                     <div className="flex flex-wrap gap-2">
                       {benefitOptions.map((option) => (
                         <Button
@@ -902,9 +948,62 @@ const JobPostPage = () => {
                         </Button>
                       ))}
                     </div>
-                    <Button variant="link" className="mt-2 text-sm">
-                      Show 8 more...
+                    
+                    {/* Show more benefits toggle */}
+                    <Button 
+                      type="button" 
+                      variant="link" 
+                      className="mt-2 text-sm p-0"
+                      onClick={() => setJobPostData({
+                        ...jobPostData,
+                        showMoreBenefits: !jobPostData.showMoreBenefits
+                      })}
+                    >
+                      {jobPostData.showMoreBenefits ? "Show fewer" : "Show 8 more..."}
                     </Button>
+                    
+                    {/* Additional benefits shown when expanded */}
+                    {jobPostData.showMoreBenefits && (
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {[
+                          "Dental insurance",
+                          "Vision insurance", 
+                          "Employee discount",
+                          "Parental leave",
+                          "Company car", 
+                          "Gym membership",
+                          "Tuition reimbursement",
+                          "Life insurance"
+                        ].map((benefit) => (
+                          <div key={benefit} className="flex items-center gap-2">
+                            <Checkbox 
+                              id={`benefit-${benefit.replace(/\s+/g, '-').toLowerCase()}`}
+                              checked={jobPostData.additionalBenefits?.includes(benefit)}
+                              onCheckedChange={(checked) => {
+                                const additionalBenefits = [...(jobPostData.additionalBenefits || [])];
+                                if (checked) {
+                                  setJobPostData({
+                                    ...jobPostData,
+                                    additionalBenefits: [...additionalBenefits, benefit]
+                                  });
+                                } else {
+                                  setJobPostData({
+                                    ...jobPostData,
+                                    additionalBenefits: additionalBenefits.filter(b => b !== benefit)
+                                  });
+                                }
+                              }}
+                            />
+                            <label 
+                              htmlFor={`benefit-${benefit.replace(/\s+/g, '-').toLowerCase()}`}
+                              className="text-sm"
+                            >
+                              {benefit}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
