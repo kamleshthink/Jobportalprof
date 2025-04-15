@@ -13,8 +13,10 @@ import {
 // Load environment variables
 dotenv.config();
 
-// MongoDB connection string - directly use MONGODB_URI
-const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/jobPortal';
+// MongoDB connection string - hardcoded for testing 
+// Uses the provided connection string directly
+const uri = 'mongodb+srv://kamleshsharmathink:db_Kamlesh123@cluster0.lpwxhp7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+console.log('Using MongoDB connection string directly');
 
 // Safe log URI without exposing credentials
 const logSafeUri = (mongoUri: string) => {

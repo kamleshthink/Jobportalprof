@@ -13,17 +13,28 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import multer from 'multer';
 
-// Initialize MongoDB connection
+// Initialize MongoDB connection - with better error handling
+console.log('Attempting to connect to MongoDB...');
 connectToMongoDB()
   .then((connected) => {
-    if (!connected) {
-      console.error('Failed to connect to MongoDB, exiting application');
-      process.exit(1);
+    if (connected) {
+      console.log('MongoDB connection established successfully, continue with application startup');
+    } else {
+      console.error('Failed to connect to MongoDB, but continuing with application startup in development mode');
+      // Don't exit in development mode - we'll handle database errors gracefully
+      if (process.env.NODE_ENV === 'production') {
+        console.error('In production mode, exiting application due to MongoDB connection failure');
+        process.exit(1);
+      }
     }
   })
   .catch((err) => {
     console.error('Error initializing MongoDB connection:', err);
-    process.exit(1);
+    // Don't exit in development mode - we'll handle database errors gracefully
+    if (process.env.NODE_ENV === 'production') {
+      console.error('In production mode, exiting application due to MongoDB connection error');
+      process.exit(1);
+    }
   });
 
 // Create application directory structure for uploads
