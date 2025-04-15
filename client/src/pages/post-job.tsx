@@ -48,7 +48,14 @@ const JobPostPage = () => {
     jobType: ["Full-time"],
     schedule: [],
     payType: "Range",
-    sponsorPlan: "Basic"
+    sponsorPlan: "Basic",
+    skills: [],
+    benefits: [],
+    supplementalPay: [],
+    screeningQuestions: [],
+    showCompanyDetails: true,
+    remote: false,
+    featured: false
   });
 
   const form = useForm({
