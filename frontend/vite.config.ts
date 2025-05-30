@@ -12,7 +12,7 @@ export default defineConfig({
   plugins: [
     react(),
     runtimeErrorOverlay(),
-    themePlugin(),
+    themePlugin({ themeFile: path.resolve(__dirname, "./theme.json") }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -24,14 +24,25 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "client", "src"),
-      "@shared": path.resolve(__dirname, "shared"),
-      "@assets": path.resolve(__dirname, "attached_assets"),
+      "@": path.resolve(__dirname, "src"),
+      "@shared": path.resolve(__dirname, "../shared"),
+      "@assets": path.resolve(__dirname, "src/assets"),
     },
   },
-  root: path.resolve(__dirname, "client"),
+  root: __dirname,
   build: {
-    outDir: path.resolve(__dirname, "dist/public"),
+    outDir: path.resolve(__dirname, "../dist/client"),
     emptyOutDir: true,
+    rollupOptions: {
+      input: path.resolve(__dirname, "index.html"),
+    },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5001',
+        changeOrigin: true
+      }
+    }
+  }
 });

@@ -2,12 +2,14 @@ import express, { type Express } from "express";
 import fs from "fs";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
-import { createServer as createViteServer, createLogger } from "vite";
+import { createServer as createViteServer, createLogger, type InlineConfig } from "vite";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { type Server } from "http";
-import viteConfig from "../vite.config";
+import viteConfig from "../frontend/vite.config";
 import { nanoid } from "nanoid";
+import react from "@vitejs/plugin-react";
+import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 const viteLogger = createLogger();
 
@@ -26,11 +28,14 @@ export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
-    allowedHosts: true,
+    allowedHosts: true as true,
   };
 
+  // Exclude plugins from viteConfig and use necessary plugins explicitly
+  const { plugins: frontendPlugins, ...restFrontendConfig } = viteConfig;
+
   const vite = await createViteServer({
-    ...viteConfig,
+    ...restFrontendConfig,
     configFile: false,
     customLogger: {
       ...viteLogger,
@@ -41,7 +46,11 @@ export async function setupVite(app: Express, server: Server) {
     },
     server: serverOptions,
     appType: "custom",
-  });
+    plugins: [
+      react(),
+      runtimeErrorOverlay(),
+    ],
+  } as InlineConfig);
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
@@ -51,15 +60,15 @@ export async function setupVite(app: Express, server: Server) {
       const clientTemplate = path.resolve(
         __dirname,
         "..",
-        "client",
+        "frontend",
         "index.html",
       );
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
+        `src="/frontend/src/main.tsx"`,
+        `src="/frontend/src/main.tsx?v=${nanoid()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);

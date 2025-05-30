@@ -15,7 +15,7 @@ dotenv.config();
 
 // MongoDB connection string - hardcoded for testing 
 // Uses the provided connection string directly
-const uri = 'mongodb+srv://kamleshsharmathink:db_Kamlesh123@cluster0.lpwxhp7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const uri = 'mongodb://localhost:27017/jobPortal';
 console.log('Using MongoDB connection string directly');
 
 // Safe log URI without exposing credentials
